@@ -9,7 +9,6 @@ import com.google.gson.annotations.SerializedName
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
-import io.flutter.plugin.common.PluginRegistry.Registrar
 
 class OpenMailAppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
     private lateinit var channel: MethodChannel
@@ -19,16 +18,6 @@ class OpenMailAppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "open_mail_app")
         channel.setMethodCallHandler(this)
         applicationContext = flutterPluginBinding.applicationContext
-    }
-
-    companion object {
-        @JvmStatic
-        fun registerWith(registrar: Registrar) {
-            val channel = MethodChannel(registrar.messenger(), "open_mail_app")
-            val plugin = OpenMailAppPlugin()
-            channel.setMethodCallHandler(plugin)
-            plugin.applicationContext = registrar.context()
-        }
     }
 
     override fun onMethodCall(@NonNull call: MethodCall, @NonNull result: MethodChannel.Result) {
@@ -57,7 +46,7 @@ class OpenMailAppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
     }
 
     private fun emailAppIntent(@NonNull chooserTitle: String): Boolean {
-        val emailIntent = Intent(Intent.ACTION_VIEW, Uri.parse("mailto:"))
+        val emailIntent = Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:"))
         val packageManager = applicationContext.packageManager
         val activities = packageManager.queryIntentActivities(emailIntent, 0)
 
@@ -77,7 +66,6 @@ class OpenMailAppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
     }
 
     private fun composeNewEmailAppIntent(@NonNull chooserTitle: String, @NonNull contentJson: String): Boolean {
-        val packageManager = applicationContext.packageManager
         val emailContent = Gson().fromJson(contentJson, EmailContent::class.java)
         val emailIntent = Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:")).apply {
             putExtra(Intent.EXTRA_EMAIL, emailContent.to.toTypedArray())
@@ -87,6 +75,7 @@ class OpenMailAppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
             putExtra(Intent.EXTRA_TEXT, emailContent.body)
         }
 
+        val packageManager = applicationContext.packageManager
         val activities = packageManager.queryIntentActivities(emailIntent, 0)
         if (activities.isNotEmpty()) {
             val intents = activities.mapNotNull {
@@ -104,11 +93,11 @@ class OpenMailAppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
     }
 
     private fun specificEmailAppIntent(name: String): Boolean {
-        val emailIntent = Intent(Intent.ACTION_VIEW, Uri.parse("mailto:"))
+        val emailIntent = Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:"))
         val packageManager = applicationContext.packageManager
         val activities = packageManager.queryIntentActivities(emailIntent, 0)
 
-        activities.firstOrNull { it.loadLabel(packageManager) == name }?.activityInfo?.packageName?.let {
+        activities.firstOrNull { it.loadLabel(packageManager).toString() == name }?.activityInfo?.packageName?.let {
             packageManager.getLaunchIntentForPackage(it)?.apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK
                 applicationContext.startActivity(this)
@@ -124,7 +113,7 @@ class OpenMailAppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
         val emailIntent = Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:"))
 
         val activities = packageManager.queryIntentActivities(emailIntent, 0)
-        val specificApp = activities.firstOrNull { it.loadLabel(packageManager) == name } ?: return false
+        val specificApp = activities.firstOrNull { it.loadLabel(packageManager).toString() == name } ?: return false
 
         val intent = Intent(Intent.ACTION_SENDTO).apply {
             data = Uri.parse("mailto:")
@@ -142,7 +131,7 @@ class OpenMailAppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
     }
 
     private fun getInstalledMailApps(): List<App> {
-        val emailIntent = Intent(Intent.ACTION_VIEW, Uri.parse("mailto:"))
+        val emailIntent = Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:"))
         val packageManager = applicationContext.packageManager
         return packageManager.queryIntentActivities(emailIntent, 0)
             .map { App(it.loadLabel(packageManager).toString()) }
